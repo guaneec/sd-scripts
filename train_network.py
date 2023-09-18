@@ -572,7 +572,9 @@ def train(args):
     prepare_scheduler_for_custom_training(noise_scheduler, accelerator.device)
 
     if accelerator.is_main_process:
-        accelerator.init_trackers("network_train" if args.log_tracker_name is None else args.log_tracker_name)
+        accelerator.init_trackers("network_train" if args.log_tracker_name is None else args.log_tracker_name, config={
+            k: v if type(v) in (float, int, bool, str, type(None)) else str(v) for k, v in vars(args).items()
+        })
 
     loss_list = []
     loss_total = 0.0
@@ -735,16 +737,14 @@ def train(args):
             if args.scale_weight_norms:
                 progress_bar.set_postfix(**{**max_mean_logs, **logs})
 
-            if args.logging_dir is not None:
-                logs = generate_step_logs(args, current_loss, avr_loss, lr_scheduler, keys_scaled, mean_norm, maximum_norm)
-                accelerator.log(logs, step=global_step)
+            logs = generate_step_logs(args, current_loss, avr_loss, lr_scheduler, keys_scaled, mean_norm, maximum_norm)
+            accelerator.log(logs, step=global_step)
 
             if global_step >= args.max_train_steps:
                 break
 
-        if args.logging_dir is not None:
-            logs = {"loss/epoch": loss_total / len(loss_list)}
-            accelerator.log(logs, step=epoch + 1)
+        logs = {"loss/epoch": loss_total / len(loss_list), "epoch": epoch + 1}
+        accelerator.log(logs, step=global_step)
 
         accelerator.wait_for_everyone()
 
